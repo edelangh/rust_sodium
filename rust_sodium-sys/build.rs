@@ -5,7 +5,6 @@ extern crate flate2;
 #[cfg(target_env = "msvc")]
 extern crate libc;
 extern crate pkg_config;
-extern crate reqwest;
 extern crate sha2;
 #[cfg(not(target_env = "msvc"))]
 extern crate tar;
@@ -14,12 +13,12 @@ extern crate unwrap;
 #[cfg(target_env = "msvc")]
 extern crate zip;
 
-use reqwest::Client;
 use sha2::{Digest, Sha256};
 use std::env;
 use std::fs;
 use std::io::{Cursor, Read};
 use std::path::Path;
+use std::fs::File;
 
 const DOWNLOAD_BASE_URL: &'static str = "https://download.libsodium.org/libsodium/releases/";
 const VERSION: &'static str = "1.0.16";
@@ -69,16 +68,23 @@ fn main() {
     }
 }
 
+use std::process::Command;
+
 /// Download the specified URL into a buffer which is returned.
 fn download(url: &str, expected_hash: &str) -> Cursor<Vec<u8>> {
     // Send GET request
-    let client = Client::new();
-    let mut response = unwrap!(client.get(url).send());
+    let download_url = format!("{}{}{}{}", DOWNLOAD_BASE_URL, "libsodium-", VERSION, ".tar.gz");
+    let wget_cmd = Command::new("curl")
+        .current_dir("/tmp")
+        .arg("-O")
+        .arg(download_url)
+        .output()
+        .unwrap();
 
-    // Only accept 2xx status codes
-    if !response.status().is_success() {
-        panic!("Download error: HTTP {}", response.status());
+    if wget_cmd.status.success() == false {
+        panic!("Failed to download libsodium");
     }
+    let mut response = File::open("/tmp/libsodium-1.0.16.tar.gz").unwrap();
     let mut buffer = vec![];
     let _ = unwrap!(response.read_to_end(&mut buffer));
 
